@@ -52,8 +52,7 @@ OP_ERROR SOP_measure::cookMySop(OP_Context &context) {
 
   GA_RWHandleV3 Phandle = gdp->findAttribute(GA_ATTRIB_POINT, "P");
   HouMesh mesh(gdp, Phandle);
-  std::vector<glm::vec3> gradients = mahou::gradient_on<HouMesh>(
-      mesh, [&Fhandle](const HouMesh &mesh, unsigned vtx) -> float { return Fhandle.get(vtx); });
+  auto gradients = mahou::gradient_on(mesh, [&Fhandle](unsigned vtx) -> float { return Fhandle.get(vtx); });
 
   GA_RWHandleV3 Vhandle = gdp->addFloatTuple(GA_ATTRIB_PRIMITIVE, "gradient", 3);
   for (GA_Offset prim = 0; prim < gradients.size(); ++prim) {

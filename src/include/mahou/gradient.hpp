@@ -4,6 +4,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+template <unsigned ROW, unsigned COL> using Matrix = Eigen::Matrix<float, ROW, COL, 0, ROW, COL>;
+
 namespace mahou {
 Eigen::Matrix3f skew_symmetric(glm::vec3 axis) {
   Eigen::Matrix3f matrix;
@@ -19,8 +21,8 @@ Eigen::Matrix3f skew_symmetric(glm::vec3 axis) {
   return matrix;
 }
 
-template <unsigned N> constexpr Eigen::Matrix<float, N, N> difference() {
-  Eigen::Matrix<float, N, N> matrix;
+template <unsigned N> constexpr Matrix<N, N> difference() {
+  Matrix<N, N> matrix;
   matrix.setZero();
   for (unsigned i = 0; i != N; ++i) {
     matrix(i, i) = -1;
@@ -29,8 +31,8 @@ template <unsigned N> constexpr Eigen::Matrix<float, N, N> difference() {
   return matrix;
 }
 
-template <unsigned N> constexpr Eigen::Matrix<float, N, N> average() {
-  Eigen::Matrix<float, N, N> matrix;
+template <unsigned N> constexpr Matrix<N, N> average() {
+  Matrix<N, N> matrix;
   matrix.setZero();
   for (unsigned i = 0; i != N; ++i) {
     matrix(i, i) = 0.5;
@@ -39,7 +41,7 @@ template <unsigned N> constexpr Eigen::Matrix<float, N, N> average() {
   return matrix;
 }
 
-template <unsigned N> glm::vec3 polyvec2(const Eigen::Matrix<float, N, 3> &positions) {
+template <unsigned N> glm::vec3 polyvec2(const Matrix<N, 3> &positions) {
   glm::vec3 result{};
   for (unsigned a = 0; a != N; ++a) {
     unsigned b = (a + 1) % N;
@@ -49,24 +51,20 @@ template <unsigned N> glm::vec3 polyvec2(const Eigen::Matrix<float, N, 3> &posit
   return result;
 }
 
-template <unsigned N> glm::vec3 polynormal(const Eigen::Matrix<float, N, 3> &positions) {
-  return glm::normalize(polyvec2<N>(positions));
+template <unsigned N> glm::vec3 polynormal(const Matrix<N, 3> &positions) {
+  return glm::normalize(polyvec2(positions));
 }
 
-template <unsigned N> float polyarea(const Eigen::Matrix<float, N, 3> &positions) {
-  return glm::length(polyvec2<N>(positions)) * 0.5;
-}
+template <unsigned N> float polyarea(const Matrix<N, 3> &positions) { return glm::length(polyvec2(positions)) * 0.5; }
 
-template <unsigned N> Eigen::Matrix<float, N, 3> edges(const Eigen::Matrix<float, N, 3> &positions) {
-  return difference<N>() * positions;
-}
+template <unsigned N> Matrix<N, 3> edges(const Matrix<N, 3> &positions) { return difference<N>() * positions; }
 
-template <unsigned N> Eigen::Matrix<float, 3, N> gradient(const Eigen::Matrix<float, N, 3> &positions) {
-  return (-1 / polyarea<N>(positions)) * skew_symmetric(polynormal<N>(positions)) * edges<N>(positions).transpose() *
+template <unsigned N> Matrix<3, N> gradient(const Matrix<N, 3> &positions) {
+  return (-1 / polyarea(positions)) * skew_symmetric(polynormal(positions)) * edges(positions).transpose() *
          average<N>();
 }
 
-template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::function<float(const T &, unsigned)> phi) {
+template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::function<float(unsigned)> phi) {
   std::vector<glm::vec3> gradients;
   gradients.reserve(mesh.num_faces());
 
@@ -81,9 +79,9 @@ template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::fun
         positions(i, 0) = p.x;
         positions(i, 1) = p.y;
         positions(i, 2) = p.z;
-        signals[i] = phi(mesh, vtx);
+        signals[i] = phi(vtx);
       }
-      facegradient = gradient<3>(positions) * signals;
+      facegradient = gradient(positions) * signals;
     } else {
       Eigen::Matrix<float, 4, 3> positions;
       Eigen::Vector4f signals;
@@ -93,9 +91,9 @@ template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::fun
         positions(i, 0) = p.x;
         positions(i, 1) = p.y;
         positions(i, 2) = p.z;
-        signals[i] = phi(mesh, vtx);
+        signals[i] = phi(vtx);
       }
-      facegradient = gradient<4>(positions) * signals;
+      facegradient = gradient(positions) * signals;
     }
     gradients.emplace_back(facegradient.x(), facegradient.y(), facegradient.z());
   }
