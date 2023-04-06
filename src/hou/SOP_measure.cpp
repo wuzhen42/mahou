@@ -1,5 +1,5 @@
 #include "SOP_measure.h"
-#include "mahou/gradient.hpp"
+#include "mahou/ddg.hpp"
 
 #include <GEO/GEO_PrimPoly.h>
 #include <GU/GU_Detail.h>

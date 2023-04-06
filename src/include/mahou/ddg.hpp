@@ -59,9 +59,51 @@ template <unsigned N> float polyarea(const Matrix<N, 3> &positions) { return glm
 
 template <unsigned N> Matrix<N, 3> edges(const Matrix<N, 3> &positions) { return difference<N>() * positions; }
 
+template <unsigned N> Matrix<N, 3> midpoints(const Matrix<N, 3> &positions) { return average<N>() * positions; }
+
+template <unsigned N> glm::vec3 center(const Matrix<N, 3> &positions) {
+  glm::vec3 sum{};
+  for (unsigned a = 0; a != N; ++a) {
+    sum += glm::vec3{positions(a, 0), positions(a, 1), positions(a, 2)};
+  }
+  return sum / float{N};
+}
+
+template <unsigned N> Matrix<N, 3> flat(const Matrix<N, 3> &positions) {
+  glm::vec3 normal = polynormal(positions);
+  Eigen::Vector3f vec_norm{normal.x, normal.y, normal.z};
+  return edges(positions) * (Eigen::Matrix3f::Identity() - vec_norm * vec_norm.transpose());
+}
+
+template <unsigned N> Matrix<3, N> sharp(const Matrix<N, 3> &positions) {
+  glm::vec3 normal = polynormal(positions);
+  glm::vec3 cent = center(positions);
+  Matrix<N, 3> mid = midpoints(positions);
+  for (unsigned i = 0; i != N; ++i) {
+    mid(i, 0) -= cent.x;
+    mid(i, 1) -= cent.y;
+    mid(i, 2) -= cent.z;
+  }
+  return (1.0 / polyarea(positions)) * skew_symmetric(normal) * mid.transpose();
+}
+
+template <unsigned N> Matrix<N, N> project(const Matrix<N, 3> &positions) {
+  return Matrix<N, N>::Identity() - flat(positions) * sharp(positions);
+}
+
+template <unsigned N> Matrix<N, N> innerproduct(const Matrix<N, 3> &positions) {
+  Matrix<3, N> U = sharp(positions);
+  return polyarea(positions) * (U.transpose() * U);
+}
+
 template <unsigned N> Matrix<3, N> gradient(const Matrix<N, 3> &positions) {
   return (-1 / polyarea(positions)) * skew_symmetric(polynormal(positions)) * edges(positions).transpose() *
          average<N>();
+}
+
+template <unsigned N> Matrix<N, N> laplace(const Matrix<N, 3> &positions) {
+  Matrix<N, N> D = difference<N>();
+  return D.transpose() * innerproduct(positions) * D;
 }
 
 template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::function<float(unsigned)> phi) {
@@ -99,6 +141,41 @@ template <typename T> std::vector<glm::vec3> gradient_on(const T &mesh, std::fun
   }
 
   return gradients;
+}
+
+template <typename T> std::vector<float> laplace_on(const T &mesh, std::function<float(unsigned)> phi) {
+  std::vector<float> laplacians;
+  laplacians.reserve(mesh.num_faces());
+
+  for (unsigned face = 0; face != mesh.num_faces(); ++face) {
+    if (mesh.is_triangle(face)) {
+      Eigen::Matrix3f positions;
+      Eigen::Vector3f signals;
+      for (unsigned i = 0; i != 3; ++i) {
+        unsigned vtx = mesh.face_vtx(face, i);
+        glm::vec3 p = mesh.position(vtx);
+        positions(i, 0) = p.x;
+        positions(i, 1) = p.y;
+        positions(i, 2) = p.z;
+        signals[i] = phi(vtx);
+      }
+      laplacians.push_back(signals.transpose() * laplace(positions) * signals);
+    } else {
+      Eigen::Matrix<float, 4, 3> positions;
+      Eigen::Vector4f signals;
+      for (unsigned i = 0; i != 4; ++i) {
+        unsigned vtx = mesh.face_vtx(face, i);
+        glm::vec3 p = mesh.position(vtx);
+        positions(i, 0) = p.x;
+        positions(i, 1) = p.y;
+        positions(i, 2) = p.z;
+        signals[i] = phi(vtx);
+      }
+      laplacians.push_back(signals.transpose() * laplace(positions) * signals);
+    }
+  }
+
+  return laplacians;
 }
 
 } // namespace mahou
