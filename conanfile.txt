@@ -4,10 +4,10 @@ boost/1.81.0
 eigen/3.4.0
 fmt/9.1.0
 
-[options]
-boost/*:header_only=True
-fmt/*:header_only=True
-
 [generators]
-CMakeDeps
-CMakeToolchain
+cmake
+
+[options]
+boost:header_only=True
+fmt:header_only=True
+
