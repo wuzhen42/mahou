@@ -1,4 +1,5 @@
 #include "octree.h"
+#include "triangulate.h"
 #include <numeric>
 #include <stack>
 
@@ -7,7 +8,9 @@
 #include <iostream>
 
 namespace mahou {
-Octree Octree::build(const TriangleSoup &triangle_soup) {
+Octree Octree::build(const Mesh &mesh) {
+  const TriangleSoup &triangle_soup = mesh.get<Triangulation>().make_soup(mesh);
+
   AABB bbox(triangle_soup);
   glm::vec3 extent = bbox.extent();
   float size = std::max(std::max(extent.x, extent.y), extent.z);
@@ -15,10 +18,10 @@ Octree Octree::build(const TriangleSoup &triangle_soup) {
 
   Octree tree;
 
-  std::stack<unsigned> open;
+  std::stack<int> open;
   {
-    const unsigned num_triangles = triangle_soup.size() / 3;
-    std::vector<unsigned> triangles(num_triangles);
+    const int num_triangles = triangle_soup.size() / 3;
+    std::vector<int> triangles(num_triangles);
     std::iota(triangles.begin(), triangles.end(), 0);
     Octree::Node top{bbox};
     top.content = triangles;
@@ -34,7 +37,7 @@ Octree Octree::build(const TriangleSoup &triangle_soup) {
     if (node.content.size() < 8)
       continue;
 
-    std::vector<unsigned> content{std::move(node.content)};
+    std::vector<int> content{std::move(node.content)};
     std::vector<Octree::Node> to_insert;
 
     AABB bbox = node.bbox;
@@ -52,8 +55,8 @@ Octree Octree::build(const TriangleSoup &triangle_soup) {
 
     for (int i = 0; i != 8; ++i) {
       AABB child_bbox{bbox.center() + 0.5f * child_extent.x * offset[i], child_extent};
-      std::vector<unsigned> child_content;
-      for (unsigned tri : content) {
+      std::vector<int> child_content;
+      for (int tri : content) {
         Triangle triangle{triangle_soup[3 * tri], triangle_soup[3 * tri + 1], triangle_soup[3 * tri + 2]};
         if (mahou::intersect(child_bbox, triangle))
           child_content.push_back(tri);
@@ -74,7 +77,7 @@ Octree Octree::build(const TriangleSoup &triangle_soup) {
       Octree::Node child{child_bbox};
       child.content = std::move(child_content);
 
-      const unsigned idx_child = tree.nodes.size() + to_insert.size();
+      const int idx_child = tree.nodes.size() + to_insert.size();
       node.children[i] = idx_child;
       to_insert.push_back(child);
     }
@@ -88,11 +91,31 @@ Octree Octree::build(const TriangleSoup &triangle_soup) {
   return tree;
 }
 
-std::vector<unsigned> Octree::intersections(Ray ray) const {
+std::optional<std::pair<float, PointOnMesh>> Octree::closest(Ray ray, const Mesh &mesh) const {
+  std::optional<std::pair<float, PointOnMesh>> result;
+  const auto &triangulation = mesh.get<Triangulation>();
+
+  for (int tri : this->all_potential_triangles(ray)) {
+    Triangle triangle{
+        mesh.position(triangulation.vtx(tri, 0)),
+        mesh.position(triangulation.vtx(tri, 1)),
+        mesh.position(triangulation.vtx(tri, 2)),
+    };
+    auto _result = intersect(ray, triangle);
+    if (!_result.has_value())
+      continue;
+    auto [t, u, v] = _result.value();
+    if (!result.has_value() || t < result.value().first)
+      result = std::make_pair(t, PointOnMesh{tri, u, v});
+  }
+  return result;
+}
+
+std::vector<int> Octree::all_potential_triangles(Ray ray) const {
   std::stack<int> open;
   open.push(0);
 
-  std::vector<unsigned> result;
+  std::vector<int> result;
   while (!open.empty()) {
     const auto &node = nodes[open.top()];
     open.pop();
@@ -100,8 +123,6 @@ std::vector<unsigned> Octree::intersections(Ray ray) const {
     if (!node.content.empty()) {
       AABB bbox = node.bbox;
       float t = intersect(ray, bbox).value();
-      std::cout << fmt::format("t: {}, bbox: ({}, {})", t, glm::to_string(bbox.min), glm::to_string(bbox.max))
-                << std::endl;
       result.insert(result.end(), node.content.begin(), node.content.end());
       continue;
     }
@@ -115,7 +136,6 @@ std::vector<unsigned> Octree::intersections(Ray ray) const {
     }
   }
 
-  std::cout << "candidate triangles: " << result.size() << std::endl;
   return result;
 }
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "intersect.h"
-#include "types.hpp"
+#include "mesh.h"
 #include <array>
 #include <vector>
 
@@ -9,16 +9,18 @@ class Octree {
   struct Node {
     explicit Node(AABB bbox) : bbox(bbox) { children.fill(0); }
 
-    std::array<unsigned, 8> children;
+    std::array<int, 8> children;
     AABB bbox;
-    std::vector<unsigned> content;
+    std::vector<int> content;
   };
   std::vector<Node> nodes;
 
-public:
-  static Octree build(const TriangleSoup &triangles);
+  std::vector<int> all_potential_triangles(Ray ray) const;
 
-  std::vector<unsigned> intersections(Ray ray) const;
+public:
+  static Octree build(const Mesh &mesh);
+
+  std::optional<std::pair<float, PointOnMesh>> closest(Ray ray, const Mesh &mesh) const;
 };
 
 } // namespace mahou
