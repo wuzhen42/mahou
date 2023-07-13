@@ -1,3 +1,3 @@
 add_subdirectory(core)
-add_subdirectory(hou)
 add_subdirectory(test)
+add_subdirectory(hou)

@@ -46,14 +46,22 @@ public:
   }
 
   template <typename T> T &get() {
-    for (const auto &x : components) {
+    require<T>();
+    for (auto &x : components) {
       if (x.type() == typeid(T))
         return std::any_cast<T &>(x);
     }
     throw std::runtime_error(fmt::format("no required component: [{}]", typeid(T).name()));
   }
 
-  template <typename T> void add_component(const T &component) { components.push_back(std::decay_t<T>{component}); }
+  template <typename T> void require() {
+    for (auto &x : components) {
+      if (x.type() == typeid(T))
+        return;
+    }
+
+    components.emplace_back(T::build(*this));
+  }
 
   static Mesh load_from_obj(std::string path);
 };

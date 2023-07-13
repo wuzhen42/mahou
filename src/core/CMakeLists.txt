@@ -1,4 +1,6 @@
 add_library(mahou_core
+	sdf.cpp
+	normal.cpp
 	octree.cpp
 	intersect.cpp
 	ddg.cpp

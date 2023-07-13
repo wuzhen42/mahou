@@ -6,6 +6,7 @@ endforeach()
 find_package(Houdini REQUIRED)
 
 add_library(mahou_hou SHARED
+	SOP_sdf.cpp
 	SOP_measure.cpp
 	initialize.cpp)
 target_link_libraries(mahou_hou PRIVATE Houdini)

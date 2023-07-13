@@ -18,7 +18,7 @@ class Octree {
   std::vector<int> all_potential_triangles(Ray ray) const;
 
 public:
-  static Octree build(const Mesh &mesh);
+  static Octree build(Mesh &mesh);
 
   std::optional<std::pair<float, PointOnMesh>> closest(Ray ray, const Mesh &mesh) const;
 };

@@ -9,7 +9,6 @@ TEST_CASE("raycast octree", "[octree]") {
   using namespace mahou;
 
   Mesh mesh = Mesh::load_from_obj("C:/proj/mahou/data/spot_triangulated.obj");
-  mesh.add_component(Triangulation::build(mesh));
   Octree octree = Octree::build(mesh);
 
   {

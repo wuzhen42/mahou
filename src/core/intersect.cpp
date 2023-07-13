@@ -157,6 +157,8 @@ std::optional<std::tuple<float, float, float>> intersect(Ray ray, Triangle trian
 
   // Calculate t, ray intersects triangle
   const float t = glm::dot(edge2, qvec) * inv_det;
+  if (t < 0)
+    return std::nullopt;
 
   return std::make_tuple(t, u, v);
 }

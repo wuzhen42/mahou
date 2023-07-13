@@ -14,15 +14,13 @@ Mesh Mesh::load_from_obj(std::string path) {
   std::string line;
   while (std::getline(fin, line)) {
     std::istringstream iss(line);
-    char key;
+    std::string key;
     iss >> key;
-    switch (key) {
-    case 'v': {
+    if ("v" == key) {
       glm::vec3 pnt;
       iss >> pnt.x >> pnt.y >> pnt.z;
       mesh.positions.push_back(pnt);
-    } break;
-    case 'f': {
+    } else if ("f" == key) {
       Face face;
       std::string vertex;
       while (iss >> vertex) {
@@ -34,11 +32,10 @@ Mesh Mesh::load_from_obj(std::string path) {
         face.push_back(std::stoi(vertex) - 1);
       }
       mesh.faces.push_back(face);
-    } break;
-    case '#':
-      break;
-    default:
-      throw std::runtime_error(fmt::format("error on loading *.obj: {}", path));
+    } else if ("#" == key || "vt" == key) {
+      continue;
+    } else {
+      throw std::runtime_error(fmt::format("error on loading obj: {} [unknown symbol: {}]", path, key));
     }
   }
 

@@ -17,5 +17,7 @@ public:
   TriangleSoup make_soup(const Mesh &mesh) const;
 
   int vtx(int tri, int id) const { return triangles[tri][id]; }
+
+  std::size_t size() const { return triangles.size(); }
 };
 } // namespace mahou

@@ -3,12 +3,8 @@
 #include <numeric>
 #include <stack>
 
-#include <fmt/format.h>
-#include <glm/gtx/string_cast.hpp>
-#include <iostream>
-
 namespace mahou {
-Octree Octree::build(const Mesh &mesh) {
+Octree Octree::build(Mesh &mesh) {
   const TriangleSoup &triangle_soup = mesh.get<Triangulation>().make_soup(mesh);
 
   AABB bbox(triangle_soup);
