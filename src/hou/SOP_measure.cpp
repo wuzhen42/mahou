@@ -1,11 +1,13 @@
 #include "SOP_measure.h"
-#include "mahou/gradient.hpp"
+#include "helper.hpp"
+#include <mahou/ddg.h>
 
 #include <GEO/GEO_PrimPoly.h>
 #include <GU/GU_Detail.h>
 #include <OP/OP_AutoLockInputs.h>
 #include <OP/OP_Director.h>
 #include <PRM/PRM_ChoiceList.h>
+#include <fmt/format.h>
 #include <glm/glm.hpp>
 
 static PRM_Name sopMeasureTypeName("type", "Measure Type");
@@ -13,31 +15,6 @@ static PRM_Name sopMeasureType[] = {PRM_Name("gradient", "Gradient X"), PRM_Name
 static PRM_ChoiceList sopMeasureTypeMenu(PRM_CHOICELIST_SINGLE, sopMeasureType);
 PRM_Template SOP_measure::myTemplateList[] = {PRM_Template(PRM_ORD, 1, &sopMeasureTypeName, 0, &sopMeasureTypeMenu),
                                               PRM_Template()};
-
-struct HouMesh {
-  GU_Detail *gdp;
-  const GA_RWHandleV3 &Phandle;
-
-public:
-  HouMesh(GU_Detail *gdp, const GA_RWHandleV3 &Phandle) : gdp(gdp), Phandle(Phandle) {}
-
-  std::size_t num_faces() const { return gdp->getNumPrimitives(); }
-
-  bool is_triangle(unsigned face) const { return gdp->getPrimitiveByIndex(face)->getVertexCount() == 3; }
-
-  unsigned face_vtx(unsigned face, unsigned localvtx) const {
-    GA_Primitive *prim = gdp->getPrimitiveByIndex(face);
-    localvtx = prim->getVertexCount() - 1 - localvtx;
-    return prim->getPointIndex(localvtx);
-  }
-
-  glm::vec3 position(unsigned vtx) const {
-    UT_Vector3F pnt = Phandle.get(gdp->pointOffset(vtx));
-    return {pnt.x(), pnt.y(), pnt.z()};
-  }
-};
-
-SOP_measure::~SOP_measure() {}
 
 OP_ERROR SOP_measure::cookMySop(OP_Context &context) {
   OP_AutoLockInputs inputs(this);
@@ -48,16 +25,17 @@ OP_ERROR SOP_measure::cookMySop(OP_Context &context) {
 
   duplicateSource(0, context);
 
-  GA_RWHandleF Fhandle = gdp->findAttribute(GA_ATTRIB_POINT, "dist");
+  try {
+    mahou::Mesh mesh = build_mahou_mesh(gdp);
+    GA_RWHandleF Fhandle = gdp->findAttribute(GA_ATTRIB_POINT, "dist");
+    auto gradients = mahou::gradient_on(mesh, [&Fhandle](int vtx) -> float { return Fhandle.get(vtx); });
 
-  GA_RWHandleV3 Phandle = gdp->findAttribute(GA_ATTRIB_POINT, "P");
-  HouMesh mesh(gdp, Phandle);
-  std::vector<glm::vec3> gradients = mahou::gradient_on<HouMesh>(
-      mesh, [&Fhandle](const HouMesh &mesh, unsigned vtx) -> float { return Fhandle.get(vtx); });
-
-  GA_RWHandleV3 Vhandle = gdp->addFloatTuple(GA_ATTRIB_PRIMITIVE, "gradient", 3);
-  for (GA_Offset prim = 0; prim < gradients.size(); ++prim) {
-    Vhandle.set(prim, UT_Vector3F{gradients[prim].x, gradients[prim].y, gradients[prim].z});
+    GA_RWHandleV3 Vhandle = gdp->addFloatTuple(GA_ATTRIB_PRIMITIVE, "gradient", 3);
+    for (GA_Offset prim = 0; prim < gradients.size(); ++prim) {
+      Vhandle.set(prim, UT_Vector3F{gradients[prim].x, gradients[prim].y, gradients[prim].z});
+    }
+  } catch (const std::runtime_error &e) {
+    addError(SOP_MESSAGE, e.what());
   }
 
   return error();

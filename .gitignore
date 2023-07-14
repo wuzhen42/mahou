@@ -1,8 +1,8 @@
 .vs/
 .vscode/
 
-build/
-CMakeUserPresets.json
+build-debug/
+build-release/
 
 *.swp
 *.pyc
