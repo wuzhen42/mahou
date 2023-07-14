@@ -1,4 +1,5 @@
 #include "sdf.h"
+#include "halfedge.h"
 #include "normal.h"
 #include "octree.h"
 #include <glm/gtx/quaternion.hpp>
@@ -33,7 +34,8 @@ SDF SDF::build(Mesh &mesh, double span, int samples) {
       face_center += mesh.position(vtx);
     face_center /= mesh.vertices(face).size();
 
-    float value = 0;
+    float total_value = 0;
+    float total_weight = 0;
     int counter = 0;
     for (int i = 0; i != samples; ++i) {
       float theta = angle_sampler(gen);
@@ -58,28 +60,102 @@ SDF SDF::build(Mesh &mesh, double span, int samples) {
         continue;
 
       float angle = std::acos(glm::dot(dir, axis));
-      value += t * (1.0f / angle);
+      float weight = angle != 0 ? 1.0f / angle : 1.0f;
+      weight = std::max(1.0f, weight);
+
+      total_value += t * weight;
+      total_weight += weight;
       counter++;
     }
-    if (counter != 0)
-      value /= counter;
-    sdf.value.push_back(value);
+    if (total_weight != 0)
+      sdf.value.push_back(total_value / total_weight);
+    else
+      sdf.value.push_back(0.f);
   }
 
+  // postprocess
+  sdf.fill_missing_value(mesh);
+  sdf.smooth(mesh);
+  sdf.normalize();
   return sdf;
 }
 
-void SDF::fill_missing_value(const Mesh &mesh) {
-  // (start_vtx, end_vtx, face)
-  std::vector<std::tuple<int, int, int>> missing;
+void SDF::fill_missing_value(Mesh &mesh) {
+  const Halfedge &halfedge = mesh.get<Halfedge>();
   for (int face = 0; face != mesh.num_faces(); ++face) {
     if (value[face] == 0) {
-      auto vertices = mesh.vertices(face);
-      for (int i = 0; i != vertices.size(); ++i) {
-        missing.emplace_back(vertices[i], vertices[(i + 1) % vertices.size()], face);
+      float sum = 0;
+      int counter = 0;
+      for (int other : halfedge.face_neighbors(face)) {
+        if (value[other] > 0) {
+          sum += value[other];
+          ++counter;
+        }
       }
+      value[face] = sum / counter;
     }
   }
+
+  float min = FLT_MAX;
+  std::vector<int> missing;
+  for (int face = 0; face != mesh.num_faces(); ++face) {
+    if (value[face] > 0)
+      min = std::min(min, value[face]);
+    else
+      missing.push_back(face);
+  }
+  for (int face : missing)
+    value[face] = min;
+}
+
+#define SQUARE(x) ((x) * (x))
+float guassian(float value, float deviation) { return std::exp(-0.5f * SQUARE(value / deviation)); }
+
+void SDF::smooth(Mesh &mesh) {
+  int window_size = std::floor(std::sqrt(mesh.num_faces() / 2000)) + 1;
+  float spatial_factor = window_size / 2.0;
+
+  const Halfedge &halfedge = mesh.get<Halfedge>();
+
+  std::vector<float> smoothed(value.size(), 0);
+  for (int face = 0; face != mesh.num_faces(); ++face) {
+    auto neighbors = halfedge.face_neighbors(face, window_size);
+    float curr = value.at(face);
+
+    float range_factor;
+    {
+      float deviation = 0;
+      for (auto [other, dist] : neighbors)
+        deviation += SQUARE(value[other] - curr);
+      deviation = std::sqrt(deviation / neighbors.size());
+      range_factor = 1.5 * deviation;
+    }
+    if (range_factor == 0) {
+      smoothed[face] = curr;
+      break;
+    }
+
+    float total_value = 0;
+    float total_weight = 0;
+    for (auto [other, dist] : neighbors) {
+      float spatial_weight = guassian(dist, spatial_factor);
+      float range_weight = guassian(std::abs(value[other] - curr), range_factor);
+      float weight = spatial_weight * range_weight;
+
+      total_value += value[other] * weight;
+      total_weight += weight;
+    }
+    smoothed[face] = total_value / total_weight;
+  }
+
+  this->value = smoothed;
+}
+#undef SQUARE
+
+void SDF::normalize() {
+  float max = *std::max_element(value.begin(), value.end());
+  for (float &x : value)
+    x /= max;
 }
 
 } // namespace mahou

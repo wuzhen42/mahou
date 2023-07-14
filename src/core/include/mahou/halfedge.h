@@ -1,5 +1,6 @@
 #pragma once
 #include "mesh.h"
+#include <set>
 
 namespace mahou {
 class Halfedge {
@@ -23,9 +24,15 @@ public:
   // TODO change this to iterator
   std::vector<Hedge> vtx_hedges(int vtx) const;
 
+  std::vector<Hedge> face_hedges(int face) const;
+
   bool vtx_on_boundary(int vtx) const;
 
-  std::vector<int> ring(int vtx) const;
+  std::vector<int> vtx_neighbors(int vtx) const;
+
+  std::vector<int> face_neighbors(int face) const;
+
+  std::vector<std::pair<int, int>> face_neighbors(int face, int level) const;
 };
 
 } // namespace mahou

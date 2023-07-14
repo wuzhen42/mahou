@@ -65,6 +65,17 @@ std::vector<Halfedge::Hedge> Halfedge::vtx_hedges(int vtx) const {
   return result;
 }
 
+std::vector<Halfedge::Hedge> Halfedge::face_hedges(int face) const {
+  int start = hedge_of_face[face];
+  int p = start;
+  std::vector<Hedge> result;
+  do {
+    result.push_back(at(p));
+    p = at(p).next;
+  } while (p != start);
+  return result;
+}
+
 bool Halfedge::vtx_on_boundary(int vtx) const {
   for (auto x : vtx_hedges(vtx)) {
     if (x.twin < 0)
@@ -73,11 +84,44 @@ bool Halfedge::vtx_on_boundary(int vtx) const {
   return false;
 }
 
-std::vector<int> Halfedge::ring(int vtx) const {
+std::vector<int> Halfedge::vtx_neighbors(int vtx) const {
   std::vector<int> vertices;
-  for (Hedge x: vtx_hedges(vtx)) {
+  for (Hedge x : vtx_hedges(vtx)) {
     vertices.push_back(at(x.prev).vtx);
   }
   return vertices;
+}
+
+std::vector<int> Halfedge::face_neighbors(int face) const {
+  std::vector<int> faces;
+  for (Hedge x : face_hedges(face)) {
+    faces.push_back(at(x.twin).face);
+  }
+  return faces;
+}
+
+std::vector<std::pair<int, int>> Halfedge::face_neighbors(int face, int level) const {
+  std::vector<std::pair<int, int>> result;
+  std::set<int> closed;
+  std::vector<int> open{face};
+
+  int dist = 1;
+  while (dist <= level) {
+    auto current = open;
+    open.clear();
+
+    for (int x : current) {
+      for (int other : face_neighbors(x)) {
+        if (closed.count(other))
+          continue;
+        result.emplace_back(other, dist);
+        open.push_back(other);
+      }
+    }
+
+    dist++;
+  }
+
+  return result;
 }
 } // namespace mahou
