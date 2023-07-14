@@ -3,6 +3,7 @@
 #include "octree.h"
 #include <glm/gtx/quaternion.hpp>
 #include <random>
+#include <set>
 
 #include "log.hpp"
 
@@ -67,4 +68,18 @@ SDF SDF::build(Mesh &mesh, double span, int samples) {
 
   return sdf;
 }
+
+void SDF::fill_missing_value(const Mesh &mesh) {
+  // (start_vtx, end_vtx, face)
+  std::vector<std::tuple<int, int, int>> missing;
+  for (int face = 0; face != mesh.num_faces(); ++face) {
+    if (value[face] == 0) {
+      auto vertices = mesh.vertices(face);
+      for (int i = 0; i != vertices.size(); ++i) {
+        missing.emplace_back(vertices[i], vertices[(i + 1) % vertices.size()], face);
+      }
+    }
+  }
+}
+
 } // namespace mahou

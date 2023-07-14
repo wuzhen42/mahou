@@ -6,6 +6,8 @@ namespace mahou {
 class SDF {
   std::vector<float> value;
 
+  void fill_missing_value(const Mesh &mesh);
+
 public:
   float at(int vtx) const { return value.at(vtx); }
 
