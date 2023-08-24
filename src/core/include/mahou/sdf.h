@@ -12,6 +12,8 @@ class SDF {
 
   void normalize();
 
+  void to_logspace();
+
 public:
   float at(int vtx) const { return value.at(vtx); }
 

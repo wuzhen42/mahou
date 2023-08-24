@@ -76,7 +76,7 @@ SDF SDF::build(Mesh &mesh, double span, int samples) {
   // postprocess
   sdf.fill_missing_value(mesh);
   sdf.smooth(mesh);
-  sdf.normalize();
+  sdf.to_logspace();
   return sdf;
 }
 
@@ -158,4 +158,13 @@ void SDF::normalize() {
     x /= max;
 }
 
+void SDF::to_logspace() {
+  auto [_min, _max] = std::minmax_element(value.begin(), value.end());
+  float min = *_min;
+  float max = *_max;
+
+  const float alpha = 4.0;
+  for (float &x : value)
+    x = std::log((x - min) / (max - min) * alpha + 1) / std::log(alpha + 1);
+}
 } // namespace mahou
